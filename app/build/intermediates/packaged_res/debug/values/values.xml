@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">然芊的猫</string>
-    <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
-        <item name="colorPrimary">#5EBCD4</item>
-        <item name="colorAccent">#5EBCD4</item>
-    </style>
-</resources>
