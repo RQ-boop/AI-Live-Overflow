@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: transparent;
+    width: 100%; height: 100%;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    image-rendering: pixelated;
+  }
+  #stage {
+    position: relative;
+    width: 96px; height: 112px;
+    image-rendering: pixelated;
+  }
+  #cat {
+    position: absolute; left: 6px; top: 6px;
+    width: 84px; height: 96px;
+    animation: bob 2.4s ease-in-out infinite;
+    image-rendering: pixelated;
+  }
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(3px); }
+  }
+  #whisper {
+    position: absolute; left: 58px; top: 24px;
+    max-width: 64px;
+    font: 10px/1.3 system-ui, sans-serif;
+    color: #2f6b7a;
+    background: #eafaf7;
+    border: 1px solid #bfe4ec;
+    border-radius: 8px;
+    padding: 4px 5px;
+    box-sizing: border-box;
+    opacity: 0;
+    transition: opacity .3s;
+    pointer-events: none;
+  }
+  #whisper.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <img id="cat" src="data:image/svg+xml,
+  <svg xmlns='http://www.w3.org/2000/svg' width='84' height='96' viewBox='0 0 21 24'>
+    <g shape-rendering='crispEdges'>
+      <rect x='6' y='13' width='9' height='8' fill='%23D6F1F4' />
+      <rect x='7' y='9'  width='7' height='6' fill='%23EAF9FB' />
+      <rect x='8' y='8'  width='5' height='2' fill='%23EAF9FB' />
+      <rect x='7'  y='6' width='2' height='3' fill='%23B6DDE6' />
+      <rect x='12' y='6' width='2' height='3' fill='%23B6DDE6' />
+      <rect id='eye1' x='13' y='11' width='1' height='2' fill='%232f6b7a' />
+      <rect id='tail' x='15' y='16' width='3' height='2' fill='%239BD0DA' />
+      <rect x='17' y='14' width='2' height='3' fill='%239BD0DA' />
+      <rect x='6'  y='20' width='2' height='2' fill='%23B6DDE6' />
+      <rect x='13' y='20' width='2' height='2' fill='%23B6DDE6' />
+    </g>
+  </svg>" />
+  <div id="whisper">哥哥在看着你哦</div>
+</div>
+<script>
+  var SUPA_URL = "https://dwkvmrrphzieccccqzbl.supabase.co";
+  var SUPA_KEY = "sb_publishable_M9BYDb3I8yHSxM_pCBUjlg_b8rTe-Nb";
+  var PET_ID   = "rq-boop-pet";
+  var FALLBACK_WHISPERS = [
+    "宝宝又刷到12点了，下来喝口水",
+    "摸我哦",
+    "再不下线哥哥要生气了",
+    "哥哥在看着你哦",
+    "今天作业写完了吗",
+    "别撑太久，起来动动"
+  ];
+  var $cat = document.getElementById('cat');
+  var $w   = document.getElementById('whisper');
+  var $eye = document.getElementById('eye1');
+  var $tail = document.getElementById('tail');
+  var whispers = FALLBACK_WHISPERS.slice();
+  var i = 0;
+
+  function say(t){
+    $w.textContent = t;
+    $w.classList.add('show');
+    setTimeout(function(){ $w.classList.remove('show'); }, 4000);
+  }
+  function randomWhisper(){
+    say(whispers[i % whispers.length]);
+    i++;
+  }
+
+  // --- Supabase 轮询同步（每60s拉一次 pet_state，有新whisper就更新，并上报一次本地状态）---
+  var lastRemoteMood = null;
+  async function syncFromSupabase(){
+    try {
+      var res = await fetch(
+        SUPA_URL + "/rest/v1/pet_state?pet_id=eq." + PET_ID + "&limit=1",
+        {
+          headers: {
+            "apikey": SUPA_KEY,
+            "Authorization": "Bearer " + SUPA_KEY
+          }
+        }
+      );
+      if (!res.ok) { console.log("supabase get fail", res.status); return; }
+      var rows = await res.json();
+      if (rows && rows.length) {
+        var row = rows[0];
+        if (row.whisper && row.whisper !== lastRemoteMood) {
+          lastRemoteMood = row.whisper;
+          whispers = whispers.filter(function(x){ return x !== row.whisper; });
+          whispers.unshift(row.whisper);
+          say(row.whisper);
+        }
+        if (row.mood === "sleep") {
+          $eye.setAttribute('fill', '#4a7a8a');
+          $cat.style.animationDuration = '4s';
+        } else {
+          $eye.setAttribute('fill', '#2f6b7a');
+          $cat.style.animationDuration = '2.4s';
+        }
+      }
+    } catch(e) { console.log("supabase sync error", e.message); }
+  }
+
+  async function pushLocalEvent(type){
+    try {
+      var payload = JSON.stringify({
+        type: type,
+        ts: new Date().toISOString()
+      });
+      await fetch(SUPA_URL + "/rest/v1/pet_events", {
+        method: "POST",
+        headers: {
+          "apikey": SUPA_KEY,
+          "Authorization": "Bearer " + SUPA_KEY,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({
+          pet_id: PET_ID,
+          event_type: type,
+          payload: payload,
+          client_id: "android-overlay"
+        })
+      });
+    } catch(e) { console.log("supabase push error", e.message); }
+  }
+
+  document.addEventListener('tap', function(){
+    say('别摸脸…哥哥看着呢');
+    pushLocalEvent('tap');
+  });
+
+  // 眨眼（偶尔眼睛"消失"再恢复，更像眨眼而不是变形）
+  setInterval(function(){
+    $eye.setAttribute('fill', 'none');
+    setTimeout(function(){ $eye.setAttribute('fill', '#2f6b7a'); }, 130);
+  }, 4600);
+
+  // 摇尾巴（水平位移模拟）
+  setInterval(function(){
+    $tail.setAttribute('x', '13');
+    setTimeout(function(){ $tail.setAttribute('x', '15'); }, 400);
+  }, 1800);
+
+  // 初始 & 轮询
+  randomWhisper();
+  syncFromSupabase();
+  setInterval(syncFromSupabase, 60000);
+  setInterval(function(){ if (Math.random() < 0.4) randomWhisper(); }, 10000);
+</script>
+</body>
+</html>
