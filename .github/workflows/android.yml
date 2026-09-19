@@ -1,0 +1,43 @@
+name: Android CI
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+      - name: Make gradlew executable
+        run: chmod +x gradlew 2>/dev/null || true
+      - name: Build with Gradle
+        run: |
+          # If no gradlew wrapper, use system gradle or download
+          if [ ! -f gradlew ]; then
+            echo 'wrapper: >\n  gradle: >\n    version: 8.5' > gradle-wrapper.properties
+            echo "import org.gradle.api.initialization.*"
+            # Use gradle from PATH or install
+            curl -sL https://services.gradle.org/distributions/gradle-8.5-bin.zip -o /tmp/gradle.zip
+            cd /tmp && unzip -q gradle.zip && cd -
+            export GRADLE_HOME=/tmp/gradle-8.5
+            /tmp/gradle-8.5/bin/gradle assembleDebug --no-daemon
+          else
+            ./gradlew assembleDebug --no-daemon
+          fi
+      - name: Find APK
+        run: |
+          find . -name '*.apk' -type f
+          ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo 'APK not found, searching...'
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deskpet-debug
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30
