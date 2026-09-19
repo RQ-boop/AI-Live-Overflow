@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">然芊的猫</string>
+    <string name="app_name">桌面小猫</string>
+    <string name="perm_needed">需要悬浮窗权限，才能把小猫放出来</string>
+    <string name="grant_btn">去开权限</string>
+    <string name="start_pet_btn">放出小猫</string>
+    <string name="stop_pet_btn">收起来</string>
+    <string name="notification_text">小猫在看着你哦</string>
 </resources>
