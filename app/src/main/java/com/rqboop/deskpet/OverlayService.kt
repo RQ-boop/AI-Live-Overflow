@@ -149,7 +149,7 @@ class OverlayService : Service() {
     }
 
     private fun startPolling() {
-        val job = object : Runnable() {
+        val job = object : Runnable {
             override fun run() {
                 applyState()
                 handler.postDelayed(this, POLL_INTERVAL_MS)
